@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "e131": "^1.1.1",
-    "hsv-rgb": "^1.0.0"
+    "hsv-rgb": "^1.0.0",
+    "rpi-433": "git+https://github.com/gschmidt/rpi-433.git"
   }
 }
