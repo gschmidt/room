@@ -13,6 +13,8 @@
     "e131": "^1.1.1",
     "hsv-rgb": "^1.0.0",
     "node-osc": "^5.1.0",
+    "request": "^2.88.2",
+    "request-promise": "^4.2.5",
     "rpi-433": "git+https://github.com/gschmidt/rpi-433.git"
   }
 }
