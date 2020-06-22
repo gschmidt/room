@@ -1,5 +1,6 @@
 {
   "name": "lights",
+  "type": "module",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -11,6 +12,7 @@
   "dependencies": {
     "e131": "^1.1.1",
     "hsv-rgb": "^1.0.0",
+    "node-osc": "^5.1.0",
     "rpi-433": "git+https://github.com/gschmidt/rpi-433.git"
   }
 }
