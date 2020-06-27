@@ -15,6 +15,7 @@
     "node-osc": "^5.1.0",
     "request": "^2.88.2",
     "request-promise": "^4.2.5",
-    "rpi-433": "git+https://github.com/gschmidt/rpi-433.git"
+    "rpi-433": "git+https://github.com/gschmidt/rpi-433.git",
+    "tplink-smarthome-api": "^2.0.0"
   }
 }

@@ -109,26 +109,26 @@ let devices = [
   {
     name: 'edison',
     on: null,
-    type: 'zap',
-    zapAddress: zapAddress(GEOFF_REMOTE_ID, 0)
+    type: 'kasa',
+    macAddress: 'B0:95:75:45:33:C4'
   },
   {
     name: 'lamp',
     on: null,
-    type: 'zap',
-    zapAddress: zapAddress(GEOFF_REMOTE_ID, 1)
+    type: 'kasa',
+    macAddress: 'B0:95:75:45:34:D4'
   },
   {
     name: 'bed',
     on: null,
-    type: 'zap',
-    zapAddress: zapAddress(GEOFF_REMOTE_ID, 2)
+    type: 'kasa',
+    macAddress: 'B0:95:75:45:38:8D'
   },
   {
     name: 'closet',
     on: null,
-    type: 'zap',
-    zapAddress: zapAddress(GEOFF_REMOTE_ID, 3)
+    type: 'kasa',
+    macAddress: 'B0:95:75:45:11:1E'
   },
   {
     name: 'cam-lights',
@@ -281,6 +281,8 @@ async function setDeviceState(device, on) {
 
   if (device.type === 'zap') {
     await setOutletState(device.zapAddress, on);
+  } else if (device.type === 'kasa') {
+    await setKasaState(device.macAddress, on);
   } else if (device.type === 'func') {
     await device.setFunc(on);
   } else {
@@ -406,6 +408,46 @@ oscServer.on('message', async function (msg, rinfo) {
     console.log(`unknown path ${msg[0]}`);
   }
 });
+
+/*****************************************************************************/
+/* TP-Link Kasa device control                                               */
+/*****************************************************************************/
+
+import { default as kasa } from 'tplink-smarthome-api';
+
+const kasaClient = new kasa.Client();
+
+// XXX should probably re-scan periodically in case devices change IP
+kasaClient.startDiscovery().on('device-new', async (kasaDevice) => {
+  let info = await kasaDevice.getSysInfo();
+  console.log(`Detected Kasa device: ${info.mac} (${info.alias}) ` +
+    `– ${info.relay_state ? 'on' : 'off'}`);
+
+  devices.forEach((device) => {
+    if (device.type === 'kasa' && device.macAddress === info.mac) {
+      device.on = !! info.relay_state;
+      device.kasaDevice = kasaDevice;
+    }
+  });
+});
+
+function getDeviceByMac(macAddress) {
+  for (let i = 0; i < devices.length; i ++) {
+    if (devices[i].type === 'kasa' && devices[i].macAddress === macAddress)
+      return devices[i];;
+  }
+
+  return null;
+}
+
+async function setKasaState(macAddress, isOn) {
+  let device = getDeviceByMac(macAddress);
+  if (! device) {
+    console.log(`Kasa device not found – ${macAddress}`);
+  }
+
+  device.kasaDevice.setPowerState(isOn);
+}
 
 /*****************************************************************************/
 /* E131 LED control and pattern generation                                   */
