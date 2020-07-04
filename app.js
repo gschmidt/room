@@ -142,7 +142,7 @@ async function sendHarmonyAction(deviceId, action) {
 import * as osc from 'node-osc';
 import { default as rp } from 'request-promise';
 
-const CONTROLLER_FORGET_MS = 5000;
+const CONTROLLER_FORGET_MS = 60*60*1000;
 
 var oscServer = new osc.Server(7000, '0.0.0.0', () => {
   console.log('OSC Server is listening');
@@ -385,6 +385,18 @@ let scenes = {
     closet: false,
     'trippy-light': false,
   },
+  'alexa-lights-out': {
+    _alexa: [ { TurnOffLightsIntent: {} }],
+    edison: false,
+    lamp: false,
+    bed: false,
+    closet: false,
+    'cam-lights': false,
+    'trippy-light': false,
+    '/rafters/warm/brightness': 0,
+    '/rafters/work/brightness': 0,
+    '/rafters/pattern/brightness': 0
+  },
   wake: {
     edison: true,
     lamp: true,
@@ -401,6 +413,7 @@ let scenes = {
     '/rafters/pattern/brightness': 0
     },
   bed: {
+    _alexa: [ { SceneIntent: { scene: 'bed' } }],
     edison: false,
     lamp: false,
     bed: true,
@@ -427,6 +440,7 @@ let scenes = {
     '/rafters/pattern/brightness': 0
   },
   chill: {
+    _alexa: [ { SceneIntent: { scene: 'chill' } }],
     edison: true,
     lamp: true,
     bed: true,
@@ -441,6 +455,7 @@ let scenes = {
     '/rafters/pattern/brightness': 0
   },
   pattern: {
+    _alexa: [ { SceneIntent: { scene: 'pattern' } }],
     edison: false,
     lamp: false,
     bed: false,
@@ -455,6 +470,7 @@ let scenes = {
     '/pattern/p1': .9
   },
   movie: {
+    _alexa: [ { SceneIntent: { scene: 'movie' } }],
     edison: false,
     lamp: false,
     bed: false,
@@ -467,6 +483,18 @@ let scenes = {
     '/rafters/warm/brightness': 0,
     '/rafters/work/brightness': 0,
     '/rafters/pattern/brightness': 0
+  },
+  'video-call': {
+    _alexa: [ { VideoCallIntent: {} }],
+    'cam-lights': true,
+    'trippy-light': true,
+    '/rafters/warm/brightness': .1,
+    '/rafters/work/brightness': .2,
+    '/rafters/pattern/brightness': 0
+  },
+  'end-video-call': {
+    _alexa: [ { EndVideoCallIntent: {} }],
+    'cam-lights': false,
   },
 };
 
@@ -482,6 +510,8 @@ async function triggerScene(sceneName) {
       /* await */ setDeviceState(device, scene[key]);
     } else if (key in oscParameters) {
       setOscParameter(key, scene[key]);
+    } else if (key === '_alexa') {
+      /* nothing */
     } else {
       console.log(`unknown key ${key} in scene ${sceneName}`);
     }
@@ -700,27 +730,74 @@ const LaunchRequestHandler = {
     return handlerInput.requestEnvelope.request.type === 'LaunchRequest';
   },
   handle(handlerInput) {
-    const speechText = 'Welcome to the Alexa Skills Kit, you can say hello!';
+    const speechText = 'What do you need?';
 
     return handlerInput.responseBuilder
       .speak(speechText)
       .reprompt(speechText)
-      .withSimpleCard('Hello World', speechText)
+      .withSimpleCard('My Room', speechText)
       .getResponse();
   }
 };
 
-const HelloWorldIntentHandler = {
+function findMatchingScene(intent, slots) {
+  const sceneNames = Object.keys(scenes);
+
+  for (let i = 0; i < sceneNames.length; i ++) {
+    const sceneName = sceneNames[i];
+    const scene = scenes[sceneName];
+    if (! scene._alexa)
+      continue;
+
+    for (let j = 0; j < scene._alexa.length; j ++) {
+      const rule = scene._alexa[j];
+      const ruleKeys = Object.keys(rule);
+      if (ruleKeys.length !== 1)
+        throw new Error(`bad rule ${JSON.stringify(rule)} in scene ${sceneName}`);
+      const ruleIntent = ruleKeys[0];
+      const ruleSlots = rule[ruleIntent];
+      if (ruleIntent !== intent)
+        continue;
+      
+      const ruleSlotKeys = Object.keys(ruleSlots);
+      let match = true;
+      for (let k = 0; k < ruleSlotKeys.length; k ++ ) {
+        const ruleSlotKey = ruleSlotKeys[k];
+        if (slots[ruleSlotKey].value !== ruleSlots[ruleSlotKey])
+          match = false;
+      }
+
+      if (match) {
+        return sceneName;
+      }
+    }
+  }
+
+  return null;
+}
+
+const MainIntentHandler = {
   canHandle(handlerInput) {
-    return handlerInput.requestEnvelope.request.type === 'IntentRequest'
-      && handlerInput.requestEnvelope.request.intent.name === 'HelloWorldIntent';
+    if (handlerInput.requestEnvelope.request.type !== 'IntentRequest')
+      return false;
+    const intent = handlerInput.requestEnvelope.request.intent.name;
+    const slots = handlerInput.requestEnvelope.request.intent.slots;
+    const sceneName = findMatchingScene(intent, slots);
+    return !! sceneName;
   },
   handle(handlerInput) {
-    const speechText = 'Hello World!';
+    const intent = handlerInput.requestEnvelope.request.intent.name;
+    const slots = handlerInput.requestEnvelope.request.intent.slots;
+    const sceneName = findMatchingScene(intent, slots);
+    if (! sceneName)
+      throw new Error(`no matching scene for ${intent} ${slots}`)
+    triggerScene(sceneName);
 
+    const speechText = '';
     return handlerInput.responseBuilder
       .speak(speechText)
-      .withSimpleCard('Hello World', speechText)
+      .withSimpleCard('My Room', speechText)
+      .withShouldEndSession(true)
       .getResponse();
   }
 };
@@ -731,12 +808,12 @@ const HelpIntentHandler = {
       && handlerInput.requestEnvelope.request.intent.name === 'AMAZON.HelpIntent';
   },
   handle(handlerInput) {
-    const speechText = 'You can say hello to me!';
+    const speechText = "Sorry, you're on your own!";
 
     return handlerInput.responseBuilder
       .speak(speechText)
-      .reprompt(speechText)
-      .withSimpleCard('Hello World', speechText)
+      .withSimpleCard('My Room', speechText)
+      .withShouldEndSession(true)
       .getResponse();
   }
 };
@@ -748,11 +825,11 @@ const CancelAndStopIntentHandler = {
         || handlerInput.requestEnvelope.request.intent.name === 'AMAZON.StopIntent');
   },
   handle(handlerInput) {
-    const speechText = 'Goodbye!';
+    const speechText = 'As you wish!';
 
     return handlerInput.responseBuilder
       .speak(speechText)
-      .withSimpleCard('Hello World', speechText)
+      .withSimpleCard('My Room', speechText)
       .withShouldEndSession(true)
       .getResponse();
   }
@@ -776,23 +853,40 @@ const ErrorHandler = {
     console.log(`Error handled: ${error.message}`);
 
     return handlerInput.responseBuilder
-      .speak('Sorry, I can\'t understand the command. Please say again.')
-      .reprompt('Sorry, I can\'t understand the command. Please say again.')
+      .speak('Not recognized')
+      .withShouldEndSession(true)
       .getResponse();
   },
 };
 
+const LogRequestInterceptor = {
+  process(handlerInput) {
+    // Log Request
+    console.log("==== REQUEST ======");
+    console.log(JSON.stringify(handlerInput.requestEnvelope, null, 2));
+  }
+}
+
+const LogResponseInterceptor = {
+  process(handlerInput, response) {
+    // Log Response
+    console.log("==== RESPONSE ======");
+    console.log(JSON.stringify(response, null, 2));
+  }
+}
 
 const app = express();
 const skillBuilder = Alexa.SkillBuilders.custom();
 skillBuilder.addRequestHandlers(
   LaunchRequestHandler,
-  HelloWorldIntentHandler,
+  MainIntentHandler,
   HelpIntentHandler,
   CancelAndStopIntentHandler,
   SessionEndedRequestHandler
 );
 skillBuilder.addErrorHandlers(ErrorHandler);
+//skillBuilder.addRequestInterceptors(LogRequestInterceptor)
+//skillBuilder.addResponseInterceptors(LogResponseInterceptor)
 const skill = skillBuilder.create();
 const adapter = new ExpressAdapter(skill, true, true);
 
