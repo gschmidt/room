@@ -10,6 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@harmonyhub/client-ws": "^1.0.4",
+    "@harmonyhub/discover": "^1.0.8",
     "ask-sdk": "^2.8.0",
     "ask-sdk-express-adapter": "^2.1.0",
     "e131": "^1.1.1",

@@ -88,6 +88,54 @@ for (let i = 0; i < 5; i ++) {
 */
 
 /*****************************************************************************/
+/* IR device control via Logitech Harmony Hub                                */
+/*****************************************************************************/
+
+import { default as HarmonyDiscover } from '@harmonyhub/discover';
+import { default as HarmonyClient } from '@harmonyhub/client-ws';
+const Explorer = HarmonyDiscover.Explorer;
+
+const HARMONY_HUB_UUID = 'e241ba2931d5c66d7a3696d18c50e6bf351d0330';
+let harmonyClient = null;
+
+const harmonyDiscover = new Explorer(61991);
+
+harmonyDiscover.on('online', async function(hub) {
+  if (hub.uuid === HARMONY_HUB_UUID) {
+    harmonyClient = await HarmonyClient.getHarmonyClient(hub.ip);
+    const commands = await harmonyClient.getAvailableCommands();
+    commands.device.forEach((device) => {
+      const actions = [];
+      device.controlGroup.forEach((controlGroup) => {
+        const name = controlGroup.name;
+        controlGroup.function.forEach((func) => {
+          actions.push(func.name);
+        });
+      });
+      console.log(`Detected Harmony device: ${device.id} (${device.label}), ${actions.length} actions`);
+//      console.log(`Actions: ${actions.join(',' )}`);
+    });
+  } else {
+    console.log(`Detected unknown Harmony hub: ${hub.uuid}`);
+  }
+    
+});
+harmonyDiscover.start();
+
+async function sendHarmonyAction(deviceId, action) {
+  if (! harmonyClient) {
+    // if this is actually a problem, add a queue
+    console.log(`ignoring Harmony action '${deviceId} ${action}' (not yet connected to hub)`);
+    return;
+  }
+  console.log(`'${deviceId} ${action}'`);
+  const result = await harmonyClient.send('holdAction', {
+    command: action,
+    deviceId: deviceId
+  });
+}
+
+/*****************************************************************************/
 /* OSC controller                                                            */
 /*****************************************************************************/
 
@@ -133,8 +181,32 @@ let devices = [
   {
     name: 'cam-lights',
     on: null,
-    type: 'zap',
-    zapAddress: zapAddress(GEOFF_REMOTE_ID, 4)
+    type: 'kasa',
+    macAddress: '1C:3B:F3:2D:9D:CA'
+  },
+  {
+    name: 'trippy-light',
+    on: null,
+    type: 'harmony',
+    deviceId: 70319669,
+    onActions: ['PowerOn', 'Light8'],
+    offActions: ['PowerOff']
+  },
+  {
+    name: 'projector',
+    on: null,
+    type: 'harmony',
+    deviceId: 70319710,
+    onActions: ['PowerOn'],
+    offActions: ['PowerOff', 1000, 'PowerOff', 1000, 'PowerOff']
+  },
+  {
+    name: 'receiver',
+    on: null,
+    type: 'harmony',
+    deviceId: 70319765,
+    onActions: ['PowerOn', 'InputDvd/Blu-ray'],
+    offActions: ['PowerOff']
   },
   {
     name: 'sand-table',
@@ -283,6 +355,14 @@ async function setDeviceState(device, on) {
     await setOutletState(device.zapAddress, on);
   } else if (device.type === 'kasa') {
     await setKasaState(device.macAddress, on);
+  } else if (device.type === 'harmony') {
+    let actions = on ? device.onActions : device.offActions;
+    for (let i = 0; i < actions.length; i ++) {
+      if (typeof actions[i] === 'number')
+        await sleep(actions[i]);
+      else
+        await sendHarmonyAction(device.deviceId, actions[i]);
+    }
   } else if (device.type === 'func') {
     await device.setFunc(on);
   } else {
@@ -295,19 +375,23 @@ let scenes = {
     edison: true,
     lamp: true,
     bed: true,
-    closet: true
+    closet: true,
+    'trippy-light': true,
   },
   'all-lights-off': {    
     edison: false,
     lamp: false,
     bed: false,
-    closet: false
+    closet: false,
+    'trippy-light': false,
   },
   wake: {
     edison: true,
     lamp: true,
     bed: true,
     closet: true,
+    'trippy-light': true,
+    projector: false,
     '/rafters/warm/brightness': .25,
     '/rafters/warm/top': 1,
     '/rafters/warm/bottom': 0,
@@ -322,7 +406,9 @@ let scenes = {
     bed: true,
     closet: false,
     'cam-lights': false,
+    'trippy-light': false,
     'sand-table': false,
+    projector: false,
     '/rafters/warm/brightness': 0,
     '/rafters/work/brightness': 0,
     '/rafters/pattern/brightness': 0
@@ -333,7 +419,9 @@ let scenes = {
     bed: false,
     closet: false,
     'cam-lights': false,
+    'trippy-light': false,
     'sand-table': false,
+    projector: false,
     '/rafters/warm/brightness': 0,
     '/rafters/work/brightness': 0,
     '/rafters/pattern/brightness': 0
@@ -344,6 +432,8 @@ let scenes = {
     bed: true,
     closet: true,
     'cam-lights': false,
+    'trippy-light': true,
+    projector: false,
     '/rafters/warm/brightness': .01,
     '/rafters/warm/top': 1,
     '/rafters/warm/bottom': 0,
@@ -356,13 +446,28 @@ let scenes = {
     bed: false,
     closet: false,
     'cam-lights': false,
+    'trippy-light': false,
     '/rafters/warm/brightness': 0,
     '/rafters/work/brightness': 0,
     '/rafters/pattern/brightness': .15,
     '/pattern/speed': .25,
     '/pattern/width': .9,
     '/pattern/p1': .9
-  }
+  },
+  movie: {
+    edison: false,
+    lamp: false,
+    bed: false,
+    closet: false,
+    'cam-lights': false,
+    'trippy-light': false,
+    'sand-table': false,
+    projector: true,
+    receiver: true,
+    '/rafters/warm/brightness': 0,
+    '/rafters/work/brightness': 0,
+    '/rafters/pattern/brightness': 0
+  },
 };
 
 async function triggerScene(sceneName) {
@@ -374,7 +479,7 @@ async function triggerScene(sceneName) {
   for (let key in scene) {
     let device = devicesByName[key];
     if (device) {
-      await setDeviceState(device, scene[key]);
+      /* await */ setDeviceState(device, scene[key]);
     } else if (key in oscParameters) {
       setOscParameter(key, scene[key]);
     } else {
@@ -401,7 +506,8 @@ oscServer.on('message', async function (msg, rinfo) {
     }
     await setDeviceState(device, ! device.on);
   } else if (path[1] === 'scene' || path[1] === 'action') {
-    await triggerScene(path[2]);
+    if (msg[1] === 1)
+      await triggerScene(path[2]);
   } else if (path[1] === 'page') {
     // ignore page switch
   } else {
@@ -456,7 +562,7 @@ async function setKasaState(macAddress, isOn) {
 import { default as e131 } from 'e131';
 import { default as rgb } from 'hsv-rgb';
 
-var e131Client = new e131.Client('10.1.1.84');  // or use a universe
+var e131Client = new e131.Client('geoff-f48.int.monument.house');  // or use a universe
 
 var channelsPerPixel = 4;
 var pixelsPerSide = 60*3;
@@ -584,7 +690,6 @@ cycleColor();
 /* Alexa interface                                                           */
 /*****************************************************************************/
 
-/*
 import { default as Alexa } from 'ask-sdk-core';
 import { default as express} from 'express';
 import { default as AskSdkExpressAdapter } from 'ask-sdk-express-adapter';
@@ -693,7 +798,6 @@ const adapter = new ExpressAdapter(skill, true, true);
 
 app.post('/', adapter.getRequestHandlers());
 app.listen(12000);
-*/
 
 /*****************************************************************************/
 
