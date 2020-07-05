@@ -720,6 +720,9 @@ cycleColor();
 /* Alexa interface                                                           */
 /*****************************************************************************/
 
+// To edit the interactions model, visit:
+// https://developer.amazon.com/alexa/console/ask/build/custom/amzn1.ask.skill.83c4d275-dd84-421b-8e1a-7b549717880c/development/en_US/dashboard
+
 import { default as Alexa } from 'ask-sdk-core';
 import { default as express} from 'express';
 import { default as AskSdkExpressAdapter } from 'ask-sdk-express-adapter';
