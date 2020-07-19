@@ -398,6 +398,7 @@ let scenes = {
     '/rafters/pattern/brightness': 0
   },
   wake: {
+    _alexa: [ { SceneIntent: { scene: 'morning' } }],
     edison: true,
     lamp: true,
     bed: true,
@@ -592,7 +593,10 @@ async function setKasaState(macAddress, isOn) {
 import { default as e131 } from 'e131';
 import { default as rgb } from 'hsv-rgb';
 
-var e131Client = new e131.Client('geoff-f48.int.monument.house');  // or use a universe
+// 10.2.0.6 is geoff-f48.int.monument.house
+// We hardcode the IP because if we don't, a bug somewhere causes a DNS
+// lookup for each and every e131 packet sent. This is a "good enough" fix
+var e131Client = new e131.Client('10.2.0.6');  // or use a universe
 
 var channelsPerPixel = 4;
 var pixelsPerSide = 60*3;
