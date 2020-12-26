@@ -10,6 +10,13 @@ function sleep(ms) {
 /* RF device control                                                         */
 /*****************************************************************************/
 
+/* This is disabled for now. I don't use the Zap RF devices anymore because the
+   radio hardware I built didn't receive codes reliably enough for it to
+   really be a great experience, and I found the TP-Link wifi-based switches
+   which are easier to work with and more reliable.
+*/
+
+/*
 import { default as rpi433 } from 'rpi-433';
 
 const rfSniffer = rpi433.sniffer({
@@ -78,6 +85,7 @@ async function setOutletState(address, shouldBeOn) {
   }
   await sleep(500);
 }
+*/
 
 /*
 let GEOFF_ROOM = 0;
@@ -183,6 +191,19 @@ let devices = [
     on: null,
     type: 'kasa',
     macAddress: '1C:3B:F3:2D:9D:CA'
+  },
+  {
+    // Right side wall switch. For switching only - not connected to a load
+    name: '207r-switch',
+    on: null,
+    type: 'kasa',
+    macAddress: 'D8:07:B6:F7:EF:82',
+    switchBehavior: {
+      type: 'one-button-scene-switch',
+      sceneList: ['chill', 'pattern', 'work-lights'],
+      selectionTime: 2000,
+      offScene: 'off'
+    }
   },
   {
     name: 'trippy-light',
@@ -347,13 +368,76 @@ function setOscParameter(name, value) {
   sendToActiveControllers(name, value);
 }
 
-async function setDeviceState(device, on) {
+async function noteDeviceState(device, on) {
+  let changedState = (device.on !== on);
   device.on = on;
   sendToActiveControllers(`/dev/${device.name}`, device.on ? 1 : 0);
 
+  if (device.switchBehavior && changedState) {
+    let behavior = device.switchBehavior;
+
+    if (behavior.type === 'one-button-scene-switch') {
+      if (! behavior._lastPushTime) {
+        behavior._lastPushTime = 0;
+        behavior._selectedIndex = null;
+        behavior._cleanupTimer = null;
+      }
+      if ((+ new Date) - behavior._lastPushTime > behavior.selectionTime) {
+        // It's been a while since the last push. Treat this as an on/off event.
+        if (behavior._selectedIndex === null)
+          behavior._selectedIndex = 0; // On - select first scene
+        else
+          behavior._selectedIndex = null; // Off
+      } else {
+        // Multiple pushes quickly. Select the next scene. (Or the first if
+        // we were previously in the off state.)
+        behavior._selectedIndex = 
+          (behavior._selectedIndex === null ? 0 :
+            behavior._selectedIndex + 1) % behavior.sceneList.length;
+      }
+
+      console.log(`select index ${behavior._selectedIndex}`);
+      if (behavior._selectedIndex === null)
+        await triggerScene(behavior.offScene);
+      else
+        await triggerScene(behavior.sceneList[behavior._selectedIndex]);
+      behavior._lastPushTime = (+ new Date);
+
+      // If the device has a "nightlight" that lights up when it is off,
+      // make that light track the selection state (will a push turn off
+      // the light, or select the next scene?) rather than whether the
+      // device thinks it's on or off (which is meaningless in this use
+      // case)
+      if (device.on) {
+        // Make the device be "off" (nightlight on) during selection timeout
+        device.on = false; // stop this from registering as a state change
+        /* await */ setDeviceState(device, false);
+      }
+
+      if (behavior._cleanupTimer)
+        clearTimeout(behavior._cleanupTimer);
+      behavior._cleanupTimer = setTimeout(() => {
+        // Make the device be "on" (nightlight off) after selection timeout
+        if (! device.on) {
+          device.on = true; // stop this from registering as a state change
+          /* await */ setDeviceState(device, true);
+        }
+      }, behavior.selectionTime);
+    } else {
+      throw new Error(`unknown switch behavor '${behavior.type}'`);
+    }
+  }
+}
+
+async function setDeviceState(device, on) {
+  await noteDeviceState(device, on);
+
+  /* Zap support disabled
   if (device.type === 'zap') {
     await setOutletState(device.zapAddress, on);
-  } else if (device.type === 'kasa') {
+    throw new Error('Zap support disabled');
+  } else */
+  if (device.type === 'kasa') {
     await setKasaState(device.macAddress, on);
   } else if (device.type === 'harmony') {
     let actions = on ? device.onActions : device.offActions;
@@ -493,6 +577,29 @@ let scenes = {
     '/rafters/work/brightness': .2,
     '/rafters/pattern/brightness': 0
   },
+  'work-lights': {
+    '/rafters/warm/brightness': .5,
+    '/rafters/warm/top': 1,
+    '/rafters/warm/bottom': 1,
+    '/rafters/work/brightness': .25,
+    '/rafters/work/top': 1,
+    '/rafters/work/bottom': 1,
+    '/rafters/pattern/brightness': 0,
+    edison: false,
+    lamp: false,
+    bed: false,
+    closet: false
+  },
+  'off': {    
+    edison: false,
+    lamp: false,
+    bed: false,
+    closet: false,
+    'trippy-light': false,
+    '/rafters/warm/brightness': 0,
+    '/rafters/work/brightness': 0,
+    '/rafters/pattern/brightness': 0,
+  },
   'end-video-call': {
     _alexa: [ { EndVideoCallIntent: {} }],
     'cam-lights': false,
@@ -555,7 +662,7 @@ import { default as kasa } from 'tplink-smarthome-api';
 const kasaClient = new kasa.Client();
 
 // XXX should probably re-scan periodically in case devices change IP
-kasaClient.startDiscovery().on('device-new', async (kasaDevice) => {
+kasaClient.startDiscovery({ discoveryInterval: 250}).on('device-new', async (kasaDevice) => {
   let info = await kasaDevice.getSysInfo();
   console.log(`Detected Kasa device: ${info.mac} (${info.alias}) ` +
     `– ${info.relay_state ? 'on' : 'off'}`);
@@ -564,6 +671,20 @@ kasaClient.startDiscovery().on('device-new', async (kasaDevice) => {
     if (device.type === 'kasa' && device.macAddress === info.mac) {
       device.on = !! info.relay_state;
       device.kasaDevice = kasaDevice;
+
+      /*
+      kasaDevice.on('power-on', () => {
+        console.log('power-on', info.alias);
+        sendToActiveControllers(`/dev/${device.name}`, 1);
+      });
+      kasaDevice.on('power-off', () => {
+        console.log('power-off', info.alias);
+        sendToActiveControllers(`/dev/${device.name}`, 0);
+      });
+      */
+      kasaDevice.on('power-update', (powerOn) => {
+        /* await */ noteDeviceState(device, powerOn);
+      });
     }
   });
 });
@@ -581,8 +702,12 @@ async function setKasaState(macAddress, isOn) {
   let device = getDeviceByMac(macAddress);
   if (! device) {
     console.log(`Kasa device not found – ${macAddress}`);
+    return;
   }
-
+  if (! device.kasaDevice) { 
+    console.log(`Ignoring offline Kasa device – ${device.name}`);
+    return;
+  }
   device.kasaDevice.setPowerState(isOn);
 }
 
@@ -593,10 +718,11 @@ async function setKasaState(macAddress, isOn) {
 import { default as e131 } from 'e131';
 import { default as rgb } from 'hsv-rgb';
 
-// 10.2.0.6 is geoff-f48.int.monument.house
+// 10.2.0.8 is geoff-f48-2.int.monument.house
 // We hardcode the IP because if we don't, a bug somewhere causes a DNS
 // lookup for each and every e131 packet sent. This is a "good enough" fix
-var e131Client = new e131.Client('10.2.0.6');  // or use a universe
+// XXX testing new controller at 10.1.8.19
+var e131Client = new e131.Client('10.2.0.8');  // or use a universe
 
 var channelsPerPixel = 4;
 var pixelsPerSide = 60*3;
