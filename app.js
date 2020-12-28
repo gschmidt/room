@@ -193,16 +193,28 @@ let devices = [
     macAddress: '1C:3B:F3:2D:9D:CA'
   },
   {
-    // Right side wall switch. For switching only - not connected to a load
-    name: '207r-switch',
+    // Left side wall switch. For switching only - not connected to a load
+    name: '207l-switch',
     on: null,
     type: 'kasa',
     macAddress: 'D8:07:B6:F7:EF:82',
     switchBehavior: {
       type: 'one-button-scene-switch',
-      sceneList: ['chill', 'pattern', 'work-lights'],
+      sceneList: ['pattern', 'work-lights'],
       selectionTime: 2000,
-      offScene: 'off'
+      offScene: 'rafters-off'
+    }
+  },
+  {
+    // Right side wall switch. For switching only - not connected to a load
+    name: '207r-switch',
+    on: null,
+    type: 'kasa',
+    macAddress: 'D8:07:B6:BF:88:AB',
+    switchBehavior: {
+      type: 'toggle-switch',
+      onScene: 'lamps-on',
+      offScene: 'lamps-off',
     }
   },
   {
@@ -376,7 +388,9 @@ async function noteDeviceState(device, on) {
   if (device.switchBehavior && changedState) {
     let behavior = device.switchBehavior;
 
-    if (behavior.type === 'one-button-scene-switch') {
+    if (behavior.type === 'toggle-switch') {
+      triggerScene(device.on ? behavior.onScene : behavior.offScene);
+    } else if (behavior.type === 'one-button-scene-switch') {
       if (! behavior._lastPushTime) {
         behavior._lastPushTime = 0;
         behavior._selectedIndex = null;
@@ -390,10 +404,11 @@ async function noteDeviceState(device, on) {
           behavior._selectedIndex = null; // Off
       } else {
         // Multiple pushes quickly. Select the next scene. (Or the first if
-        // we were previously in the off state.)
+        // we were previously in the off state, or 'off' if at the last scene.)
         behavior._selectedIndex = 
-          (behavior._selectedIndex === null ? 0 :
-            behavior._selectedIndex + 1) % behavior.sceneList.length;
+          (behavior._selectedIndex === null ? 0 : behavior._selectedIndex + 1);
+        if (behavior._selectedIndex === behavior.sceneList.length)
+          behavior._selectedIndex = null;
       }
 
       console.log(`select index ${behavior._selectedIndex}`);
@@ -539,7 +554,7 @@ let scenes = {
     '/rafters/work/brightness': 0,
     '/rafters/pattern/brightness': 0
   },
-  pattern: {
+  'alexa-pattern': {
     _alexa: [ { SceneIntent: { scene: 'pattern' } }],
     edison: false,
     lamp: false,
@@ -547,6 +562,19 @@ let scenes = {
     closet: false,
     'cam-lights': false,
     'trippy-light': false,
+    '/rafters/warm/brightness': 0,
+    '/rafters/work/brightness': 0,
+    '/rafters/pattern/brightness': .15,
+    '/pattern/speed': .25,
+    '/pattern/width': .9,
+    '/pattern/p1': .9
+  },
+  // XXX add a way to 'include' one pattern in another so that I don't have
+  // to repeat myself here
+  // XXX maybe also allow the list of scenes for a switch to include multiple
+  // scenes per switch position, or an inline scene (with includes), again
+  // to reduce proliferation of scenes
+  'pattern': {
     '/rafters/warm/brightness': 0,
     '/rafters/work/brightness': 0,
     '/rafters/pattern/brightness': .15,
@@ -585,17 +613,20 @@ let scenes = {
     '/rafters/work/top': 1,
     '/rafters/work/bottom': 1,
     '/rafters/pattern/brightness': 0,
-    edison: false,
-    lamp: false,
-    bed: false,
-    closet: false
   },
-  'off': {    
+  'lamps-on': {
+    edison: true,
+    lamp: true,
+    bed: true,
+    closet: true
+  },
+  'lamps-off': {
     edison: false,
     lamp: false,
     bed: false,
     closet: false,
-    'trippy-light': false,
+  },
+  'rafters-off': {    
     '/rafters/warm/brightness': 0,
     '/rafters/work/brightness': 0,
     '/rafters/pattern/brightness': 0,
