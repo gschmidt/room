@@ -287,12 +287,12 @@ let oscParameters = {
   '/rafters/work/brightness': 0,
   '/rafters/work/top': 0,
   '/rafters/work/bottom': 0,
-  '/rafters/pattern/brightness': 0,
-  '/rafters/pattern/top': 0,
-  '/rafters/pattern/bottom': 0,
+  '/rafters/pattern/brightness': 1, // XXX
+  '/rafters/pattern/top': 1, // XXX
+  '/rafters/pattern/bottom': 1, // XXX
   '/pattern/speed': .3,
   '/pattern/width': .5,
-  '/pattern/p1': .75,
+  '/pattern/p1': 1,
   '/pattern/p2': 0  
 };
 
@@ -839,7 +839,7 @@ function cycleColor() {
     let patternIsOn = !! oscParameters[`/rafters/pattern/${side ? "top" : "bottom"}`];
     if (patternIsOn) {
       let saturation = oscParameters['/pattern/p1'];
-      let pattern = rgb(((hueStart + pixel * hueStep) % 1) * 360,
+      let pattern = rgb(((hueStart + pixel * hueStep + rafter/8.0) % 1) * 360,
         saturation * 100,
         oscParameters['/rafters/pattern/brightness'] * 100);
       rgbw[0] += pattern[0];
