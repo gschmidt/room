@@ -187,6 +187,8 @@ let devices = [
     macAddress: 'B0:95:75:45:11:1E'
   },
   {
+    // Used to be videoconferencing lights at desk, but is now Turkish lamp
+    // Can't rename it without updating the TouchOSC config so save for later
     name: 'cam-lights',
     on: null,
     type: 'kasa',
@@ -395,8 +397,19 @@ async function noteDeviceState(device, on) {
         behavior._lastPushTime = 0;
         behavior._selectedIndex = null;
         behavior._cleanupTimer = null;
+        behavior._transitioningToState = null;
       }
-      if ((+ new Date) - behavior._lastPushTime > behavior.selectionTime) {
+
+      // Don't let our own state changes, echoed back to us, count as user presses
+      if (behavior._transitioningToState !== null) {
+        if (behavior._transitioningToState === device.on) {
+          // Have now reached target state - future changes are real pushes
+          behavior._transitioningToState = null;
+        }
+        return;
+      }
+
+      if (behavior._cleanupTimer === null) {
         // It's been a while since the last push. Treat this as an on/off event.
         if (behavior._selectedIndex === null)
           behavior._selectedIndex = 0; // On - select first scene
@@ -405,7 +418,7 @@ async function noteDeviceState(device, on) {
       } else {
         // Multiple pushes quickly. Select the next scene. (Or the first if
         // we were previously in the off state, or 'off' if at the last scene.)
-        behavior._selectedIndex = 
+        behavior._selectedIndex =
           (behavior._selectedIndex === null ? 0 : behavior._selectedIndex + 1);
         if (behavior._selectedIndex === behavior.sceneList.length)
           behavior._selectedIndex = null;
@@ -418,24 +431,19 @@ async function noteDeviceState(device, on) {
         await triggerScene(behavior.sceneList[behavior._selectedIndex]);
       behavior._lastPushTime = (+ new Date);
 
-      // If the device has a "nightlight" that lights up when it is off,
-      // make that light track the selection state (will a push turn off
-      // the light, or select the next scene?) rather than whether the
-      // device thinks it's on or off (which is meaningless in this use
-      // case)
-      if (device.on) {
-        // Make the device be "off" (nightlight on) during selection timeout
-        device.on = false; // stop this from registering as a state change
-        /* await */ setDeviceState(device, false);
-      }
-
       if (behavior._cleanupTimer)
         clearTimeout(behavior._cleanupTimer);
       behavior._cleanupTimer = setTimeout(() => {
-        // Make the device be "on" (nightlight off) after selection timeout
+        behavior._cleanupTimer = null; // exit selection mode
+        // Make the device be in an "on" state, so that if it has a
+        // "nightlight" that lights up when it is off, it isn't lit.
         if (! device.on) {
-          device.on = true; // stop this from registering as a state change
-          /* await */ setDeviceState(device, true);
+          // Stop this from registering as a user switch press by ignoring all state
+          // changes until we see the effect of the change we're about to make (we can't
+          // just set device.on to true because we might observe a 'false' poll before we
+          // see the result of our change)
+          behavior._transitioningToState = true;
+          /* await */ setDeviceState(device, true, { updateHardwareOnly: true });
         }
       }, behavior.selectionTime);
     } else {
@@ -444,8 +452,9 @@ async function noteDeviceState(device, on) {
   }
 }
 
-async function setDeviceState(device, on) {
-  await noteDeviceState(device, on);
+async function setDeviceState(device, on, options) {
+  if (! options || ! options.updateHardwareOnly)
+    await noteDeviceState(device, on);
 
   /* Zap support disabled
   if (device.type === 'zap') {
@@ -475,6 +484,7 @@ let scenes = {
     lamp: true,
     bed: true,
     closet: true,
+    'cam-lights': true,
     'trippy-light': true,
   },
   'all-lights-off': {    
@@ -545,7 +555,7 @@ let scenes = {
     lamp: true,
     bed: true,
     closet: true,
-    'cam-lights': false,
+    'cam-lights': true,
     'trippy-light': true,
     projector: false,
     '/rafters/warm/brightness': .01,
@@ -632,7 +642,7 @@ let scenes = {
     '/rafters/pattern/brightness': 0,
   },
   'end-video-call': {
-    _alexa: [ { EndVideoCallIntent: {} }],
+//    _alexa: [ { EndVideoCallIntent: {} }],
     'cam-lights': false,
   },
 };
@@ -735,7 +745,7 @@ async function setKasaState(macAddress, isOn) {
     console.log(`Kasa device not found – ${macAddress}`);
     return;
   }
-  if (! device.kasaDevice) { 
+  if (! device.kasaDevice) {
     console.log(`Ignoring offline Kasa device – ${device.name}`);
     return;
   }
@@ -822,7 +832,7 @@ function cycleColor() {
   var pixel = -1;
   var side = 0;
   var rafter = 0;
-  
+
   for (var idx = 0; idx < totalChannels; idx += channelsPerPixel) {
     pixel++;
     if (pixel === pixelsPerSide) {
