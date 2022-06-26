@@ -480,6 +480,7 @@ async function setDeviceState(device, on, options) {
 
 let scenes = {
   'all-lights-on': {    
+    '207r-switch': true,
     edison: true,
     lamp: true,
     bed: true,
@@ -488,6 +489,7 @@ let scenes = {
     'trippy-light': true,
   },
   'all-lights-off': {    
+    '207r-switch': false,
     edison: false,
     lamp: false,
     bed: false,
@@ -496,6 +498,7 @@ let scenes = {
   },
   'alexa-lights-out': {
     _alexa: [ { TurnOffLightsIntent: {} }],
+    '207r-switch': false,
     edison: false,
     lamp: false,
     bed: false,
@@ -508,6 +511,7 @@ let scenes = {
   },
   wake: {
     _alexa: [ { SceneIntent: { scene: 'morning' } }],
+    '207r-switch': true,
     edison: true,
     lamp: true,
     bed: true,
@@ -524,6 +528,7 @@ let scenes = {
     },
   bed: {
     _alexa: [ { SceneIntent: { scene: 'bed' } }],
+    '207r-switch': false,
     edison: false,
     lamp: false,
     bed: true,
@@ -537,6 +542,7 @@ let scenes = {
     '/rafters/pattern/brightness': 0
   },
   sleep: {
+    '207r-switch': false,
     edison: false,
     lamp: false,
     bed: false,
@@ -551,6 +557,7 @@ let scenes = {
   },
   chill: {
     _alexa: [ { SceneIntent: { scene: 'chill' } }],
+    '207r-switch': true,
     edison: true,
     lamp: true,
     bed: true,
@@ -594,6 +601,7 @@ let scenes = {
   },
   movie: {
     _alexa: [ { SceneIntent: { scene: 'movie' } }],
+    '207r-switch': false,
     edison: false,
     lamp: false,
     bed: false,
@@ -625,16 +633,20 @@ let scenes = {
     '/rafters/pattern/brightness': 0,
   },
   'lamps-on': {
+    '207r-switch': true,
     edison: true,
     lamp: true,
     bed: true,
-    closet: true
+    closet: true,
+    'cam-lights': true
   },
   'lamps-off': {
+    '207r-switch': false,
     edison: false,
     lamp: false,
     bed: false,
     closet: false,
+    'cam-lights': false
   },
   'rafters-off': {    
     '/rafters/warm/brightness': 0,
