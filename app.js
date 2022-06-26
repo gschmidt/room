@@ -505,9 +505,12 @@ let scenes = {
     closet: false,
     'cam-lights': false,
     'trippy-light': false,
-    '/rafters/warm/brightness': 0,
-    '/rafters/work/brightness': 0,
-    '/rafters/pattern/brightness': 0
+    '/rafters/warm/top': 0,
+    '/rafters/warm/bottom': 0,
+    '/rafters/work/top': 0,
+    '/rafters/work/bottom': 0,
+    '/rafters/pattern/top': 0,
+    '/rafters/pattern/bottom': 0
   },
   wake: {
     _alexa: [ { SceneIntent: { scene: 'morning' } }],
@@ -648,10 +651,13 @@ let scenes = {
     closet: false,
     'cam-lights': false
   },
-  'rafters-off': {    
-    '/rafters/warm/brightness': 0,
-    '/rafters/work/brightness': 0,
-    '/rafters/pattern/brightness': 0,
+  'rafters-off': {
+    '/rafters/warm/top': 0,
+    '/rafters/warm/bottom': 0,
+    '/rafters/work/top': 0,
+    '/rafters/work/bottom': 0,
+    '/rafters/pattern/top': 0,
+    '/rafters/pattern/bottom': 0
   },
   'end-video-call': {
 //    _alexa: [ { EndVideoCallIntent: {} }],
@@ -826,6 +832,7 @@ let hueCenter = 0;
 
 let framesPerSecond = 40;
 let frame = 0;
+let isPaused = false;
 
 function cycleColor() {
   let patternSpeed = oscParameters['/pattern/speed'];
@@ -844,6 +851,7 @@ function cycleColor() {
   var pixel = -1;
   var side = 0;
   var rafter = 0;
+  var anyOn = false;
 
   for (var idx = 0; idx < totalChannels; idx += channelsPerPixel) {
     pixel++;
@@ -886,6 +894,25 @@ function cycleColor() {
     buf[idx + 1] = Math.min(rgbw[0], 255); // red
     buf[idx + 2] = Math.min(rgbw[2], 255); // blue
     buf[idx + 3] = Math.min(rgbw[3], 255); // warm white
+    anyOn = anyOn || patternIsOn || warmIsOn || workIsOn;
+  }
+
+  // If we're not rendering any data onto the LEDs, render one final frame
+  // (to leave the lights in the expected state) and then stop sending data.
+  // This allows another process to control the lights.
+  if (anyOn) {
+    if (isPaused) {
+      console.log("resuming LED rendering");
+      isPaused = false;
+    }
+  } else {
+    if (isPaused) {
+      setTimeout(cycleColor, 1000.0 / framesPerSecond);
+      return;
+    } else {
+      console.log("pausing LED rendering after this frame");
+      isPaused = true;
+    }
   }
 
   sendPackets(buf, function () {
