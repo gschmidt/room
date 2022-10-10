@@ -249,10 +249,15 @@ let devices = [
     type: 'func',
     getFunc: async () => {
       console.log("get table state");
-      let body = await rp.post({
-        url: `http://sisyphus.local/sisbot/state`,
-        form: { data: '{}' },
-      });
+      try {
+        let body = await rp.post({
+          url: `http://sisyphus.local/sisbot/state`,
+          form: { data: '{}' },
+        });
+      } catch (e) {
+        console.log(`can't get table state: ${e}`);
+        return null
+      }
 
       let state = JSON.parse(body);
       let sisbot = null;
@@ -266,10 +271,14 @@ let devices = [
     setFunc: async (isOn) => {
       let endpoint = isOn ? "wake_sisbot" : "sleep_sisbot";
 
-      await rp.post({
-        url: `http://sisyphus.local/sisbot/${endpoint}`,
-        form: { data: '{}' },
-      });
+      try {
+        await rp.post({
+          url: `http://sisyphus.local/sisbot/${endpoint}`,
+          form: { data: '{}' },
+        });
+      } catch (e) {
+        console.log(`Can't set table state: ${e}`);
+      }
     }
   },
 ];
