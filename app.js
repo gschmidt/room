@@ -249,8 +249,9 @@ let devices = [
     type: 'func',
     getFunc: async () => {
       console.log("get table state");
+      let body;
       try {
-        let body = await rp.post({
+        body = await rp.post({
           url: `http://sisyphus.local/sisbot/state`,
           form: { data: '{}' },
         });
