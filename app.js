@@ -152,7 +152,8 @@ import { default as rp } from 'request-promise';
 
 const CONTROLLER_FORGET_MS = 60*60*1000;
 
-var oscServer = new osc.Server(7000, '0.0.0.0', () => {
+// XXX changed from 7000 to 7009 to make it stop restarting so I can sleep
+var oscServer = new osc.Server(7009, '0.0.0.0', () => {
   console.log('OSC Server is listening');
 });
 
@@ -787,11 +788,10 @@ async function setKasaState(macAddress, isOn) {
 import { default as e131 } from 'e131';
 import { default as rgb } from 'hsv-rgb';
 
-// 10.2.0.8 is geoff-f48-2.int.monument.house
+// 10.2.0.2 is falcon48-room.geoffschmidt.com
 // We hardcode the IP because if we don't, a bug somewhere causes a DNS
 // lookup for each and every e131 packet sent. This is a "good enough" fix
-// XXX testing new controller at 10.1.8.19
-var e131Client = new e131.Client('10.2.0.8');  // or use a universe
+var e131Client = new e131.Client('10.2.0.2');  // or use a universe
 
 var channelsPerPixel = 4;
 var pixelsPerSide = 60*3;
