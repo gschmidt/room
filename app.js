@@ -900,6 +900,12 @@ function cycleColor() {
       rgbw[2] += amount;
     }
 
+    // Blank a few lights that are not working (flickering) and for which 
+    // I don't have replacements on hand at the moment (until I can order
+    // more or solder past the broken LED)
+    if (rafter === 2 && side === 1 && pixel > 128)
+      rgbw = [0, 0, 0, 0];
+
     buf[idx + 0] = Math.min(rgbw[1], 255); // green
     buf[idx + 1] = Math.min(rgbw[0], 255); // red
     buf[idx + 2] = Math.min(rgbw[2], 255); // blue
