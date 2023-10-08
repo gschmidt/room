@@ -1,3 +1,4 @@
 node_modules/
 nohup.out
 startup.log
+.DS_Store
