@@ -164,7 +164,7 @@ let devices = [
       let body;
       try {
         body = await rp.post({
-          url: `http://sisyphus.local/sisbot/state`,
+          url: `http://sisyphus.geoffschmidt.com/sisbot/state`,
           form: { data: '{}' },
         });
       } catch (e) {
@@ -179,14 +179,16 @@ let devices = [
           sisbot = item;
         }
       });
-      return sisbot.is_sleeping === "false"; // note: this is a string, not a boolean!
+      const isOn = sisbot.is_sleeping === "false"; // note: this is a string, not a boolean!
+      console.log(`table state is ${isOn ? "on": "off"}`);
+      return isOn;
     },
     setFunc: async (isOn) => {
       let endpoint = isOn ? "wake_sisbot" : "sleep_sisbot";
 
       try {
         await rp.post({
-          url: `http://sisyphus.local/sisbot/${endpoint}`,
+          url: `http://sisyphus.geoffschmidt.com/sisbot/${endpoint}`,
           form: { data: '{}' },
         });
       } catch (e) {
