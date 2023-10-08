@@ -642,7 +642,10 @@ import { default as kasa } from 'tplink-smarthome-api';
 
 const kasaClient = new kasa.Client({
   defaultSendOptions: {
-    transport: 'udp'
+    // While UDP is probably better in theory, even a single lost packet throws
+    // an exception that crashes the app (if a response isn't received in the expected
+    // time). Turn UDP back on once that's been addressed
+    transport: 'tcp'
   },
   /* logLevel: "debug" */ });
 
