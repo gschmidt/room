@@ -7,135 +7,39 @@ function sleep(ms) {
 }
 
 /*****************************************************************************/
-/* RF device control                                                         */
-/*****************************************************************************/
-
-/* This is disabled for now. I don't use the Zap RF devices anymore because the
-   radio hardware I built didn't receive codes reliably enough for it to
-   really be a great experience, and I found the TP-Link wifi-based switches
-   which are easier to work with and more reliable.
-*/
-
-/*
-import { default as rpi433 } from 'rpi-433';
-
-const rfSniffer = rpi433.sniffer({
-  pin: 2,
-  debounceDelay: 100
-});
-
-const rfEmitter = rpi433.emitter({
-  pin: 29,
-  pulseLength: 180
-  });
-
-rfSniffer.on("data", function (data) {
-  console.log(
-    "Code received: " + data.code + " pulse length : " + data.pulseLength
-  );
-  let command = data.code & 0xF;
-  if (command !== 0x3 && command !== 0xC)
-    return;
-  let isOn = (command === 0x3);
-  let address = data.code >> 4;
-
-  // Compare address to the return value of zapAddress to detect a pressed button, eg:
-  // if (address === zapAddress(GEOFF_REMOTE_ID, 4)) { if (isOn) { ... } }
-
-  // To send codes, we should wait until there's been nothing received for a
-  // period of time (say 50ms) to avoid interference
-});
-
-let GEOFF_REMOTE_ID = 12;
-
-// remoteId is 0..31 (based on the 5 bit address soldered into the remote)
-// Pads soldered to ground are a 0, floating (unsoldered) pads are a 1
-// 
-// button is 0..4 (the five buttons, top to bottom)
-function zapAddress(remoteId, button) {
-  var parts = [];
-
-  for (let bit = 4; bit >= 0; bit--) {
-    parts.push(remoteId & (1 << bit) ? "01" : "00");
-  }
-
-  for (let i = 4; i >= 0; i--) {
-    if (i === button)
-      parts.push("11");
-    else
-      parts.push(i > 1 ? "01" : "00");
-  }
-
-  return parseInt(parts.join(''), 2);
-}
-
-function monumentAddress(room, device) {
-  // The encoder chip used inside the Zap devices can't generate codes that start
-  // with 10. Start with 10101010 for good measure, then allow an 8-bit room code and
-  // and an 8-bit device code.
-  return (0xAA << 16) + (room << 8) + device;
-}
-
-async function setOutletState(address, shouldBeOn) {
-  let code = (address << 4) + (shouldBeOn ? 0x3 : 0xC);
-  console.log(`send ${code}`)
-  for (let i = 0; i < 3; i ++) {
-    rfEmitter.sendCode(code);
-    await sleep(50);
-  }
-  await sleep(500);
-}
-*/
-
-/*
-let GEOFF_ROOM = 0;
-console.log("Geoff room codes:");
-for (let i = 0; i < 5; i ++) {
-  console.log(monumentAddress(GEOFF_ROOM, i));
-}
-*/
-
-/*****************************************************************************/
 /* IR device control via Logitech Harmony Hub                                */
 /*****************************************************************************/
 
-import { default as HarmonyDiscover } from '@harmonyhub/discover';
 import { default as HarmonyClient } from '@harmonyhub/client-ws';
-const Explorer = HarmonyDiscover.Explorer;
 
-const HARMONY_HUB_UUID = 'e241ba2931d5c66d7a3696d18c50e6bf351d0330';
-let harmonyClient = null;
+// For the record, our Harmony Hub UUID is:
+//   e241ba2931d5c66d7a3696d18c50e6bf351d0330
+// But now we find it via DHCP IP binding (to its MAC) rather than
+// though broadcast discovery, which isn't easy from Docker containers.
+const HARMONY_HUB_HOSTNAME = 'hub.harmony.geoffschmidt.com';
 
-const harmonyDiscover = new Explorer(61991);
-
-harmonyDiscover.on('online', async function(hub) {
-  if (hub.uuid === HARMONY_HUB_UUID) {
-    harmonyClient = await HarmonyClient.getHarmonyClient(hub.ip);
-    const commands = await harmonyClient.getAvailableCommands();
-    commands.device.forEach((device) => {
-      const actions = [];
-      device.controlGroup.forEach((controlGroup) => {
-        const name = controlGroup.name;
-        controlGroup.function.forEach((func) => {
-          actions.push(func.name);
-        });
+async function connectToHarmonyHub(hostname) {
+  const client = await HarmonyClient.getHarmonyClient(hostname);
+  const commands = await client.getAvailableCommands();
+  commands.device.forEach((device) => {
+    const actions = [];
+    device.controlGroup.forEach((controlGroup) => {
+      const name = controlGroup.name;
+      controlGroup.function.forEach((func) => {
+        actions.push(func.name);
       });
-      console.log(`Detected Harmony device: ${device.id} (${device.label}), ${actions.length} actions`);
-//      console.log(`Actions: ${actions.join(',' )}`);
     });
-  } else {
-    console.log(`Detected unknown Harmony hub: ${hub.uuid}`);
-  }
-    
-});
-harmonyDiscover.start();
+    console.log(`Detected Harmony device: ${device.id} (${device.label}), ${actions.length} actions`);
+//      console.log(`Actions: ${actions.join(',' )}`);
+  });
+
+  return client;
+};
+
+// Perhaps be robust to failing to connect to the Harmony Hub?
+let harmonyClient = await connectToHarmonyHub(HARMONY_HUB_HOSTNAME);
 
 async function sendHarmonyAction(deviceId, action) {
-  if (! harmonyClient) {
-    // if this is actually a problem, add a queue
-    console.log(`ignoring Harmony action '${deviceId} ${action}' (not yet connected to hub)`);
-    return;
-  }
   console.log(`'${deviceId} ${action}'`);
   const result = await harmonyClient.send('holdAction', {
     command: action,
@@ -167,25 +71,29 @@ let devices = [
     name: 'edison',
     on: null,
     type: 'kasa',
-    macAddress: 'B0:95:75:45:33:C4'
+//    macAddress: 'B0:95:75:45:33:C4',
+    host: 'edison-bulbs.kasa.geoffschmidt.com'
   },
   {
     name: 'lamp',
     on: null,
     type: 'kasa',
-    macAddress: 'B0:95:75:45:34:D4'
+//    macAddress: 'B0:95:75:45:34:D4',
+    host: 'lamp.kasa.geoffschmidt.com'
   },
   {
     name: 'bed',
     on: null,
     type: 'kasa',
-    macAddress: 'B0:95:75:45:38:8D'
+//    macAddress: 'B0:95:75:45:38:8D',
+    host: 'bed.kasa.geoffschmidt.com'
   },
   {
     name: 'closet',
     on: null,
     type: 'kasa',
-    macAddress: 'B0:95:75:45:11:1E'
+//    macAddress: 'B0:95:75:45:11:1E'
+    host: 'closet.kasa.geoffschmidt.com'
   },
   {
     // Used to be videoconferencing lights at desk, but is now Turkish lamp
@@ -193,14 +101,16 @@ let devices = [
     name: 'cam-lights',
     on: null,
     type: 'kasa',
-    macAddress: '1C:3B:F3:2D:9D:CA'
+//    macAddress: '1C:3B:F3:2D:9D:CA',
+    host: 'turkish-lamp.kasa.geoffschmidt.com'
   },
   {
     // Left side wall switch. For switching only - not connected to a load
     name: '207l-switch',
     on: null,
     type: 'kasa',
-    macAddress: 'D8:07:B6:F7:EF:82',
+//    macAddress: 'D8:07:B6:F7:EF:82',
+    host: '207-left.kasa.geoffschmidt.com',
     switchBehavior: {
       type: 'one-button-scene-switch',
       sceneList: ['pattern', 'work-lights'],
@@ -213,7 +123,8 @@ let devices = [
     name: '207r-switch',
     on: null,
     type: 'kasa',
-    macAddress: 'D8:07:B6:BF:88:AB',
+//    macAddress: 'D8:07:B6:BF:88:AB',
+    host: '207-right.kasa.geoffschmidt.com',
     switchBehavior: {
       type: 'toggle-switch',
       onScene: 'lamps-on',
@@ -467,13 +378,11 @@ async function setDeviceState(device, on, options) {
   if (! options || ! options.updateHardwareOnly)
     await noteDeviceState(device, on);
 
-  /* Zap support disabled
-  if (device.type === 'zap') {
-    await setOutletState(device.zapAddress, on);
-    throw new Error('Zap support disabled');
-  } else */
   if (device.type === 'kasa') {
-    await setKasaState(device.macAddress, on);
+    if (! device.kasaDevice)
+      console.log(`Ignoring offline Kasa device – ${device.name}`);
+    else
+      device.kasaDevice.setPowerState(on);
   } else if (device.type === 'harmony') {
     let actions = on ? device.onActions : device.offActions;
     for (let i = 0; i < actions.length; i ++) {
@@ -729,57 +638,32 @@ oscServer.on('message', async function (msg, rinfo) {
 
 import { default as kasa } from 'tplink-smarthome-api';
 
-const kasaClient = new kasa.Client();
+const kasaClient = new kasa.Client({ /* logLevel: "debug" */ });
 
-// XXX should probably re-scan periodically in case devices change IP
-kasaClient.startDiscovery({ discoveryInterval: 250}).on('device-new', async (kasaDevice) => {
-  let info = await kasaDevice.getSysInfo();
-  console.log(`Detected Kasa device: ${info.mac} (${info.alias}) ` +
-    `– ${info.relay_state ? 'on' : 'off'}`);
+// XXX make it robust to these devices being temporarily offline?
+devices.forEach(async function (device) {
+  if (device.type === 'kasa') {
+    const kasaDevice = await kasaClient.getDevice({ host: device.host });
+    let info = await kasaDevice.getSysInfo();
+    console.log(`Kasa device ${device.host} (${info.alias}) is ${info.relay_state ? 'on' : 'off'}`);
+    device.on = !! info.relay_state;
+    device.kasaDevice = kasaDevice;
 
-  devices.forEach((device) => {
-    if (device.type === 'kasa' && device.macAddress === info.mac) {
-      device.on = !! info.relay_state;
-      device.kasaDevice = kasaDevice;
-
-      /*
-      kasaDevice.on('power-on', () => {
-        console.log('power-on', info.alias);
-        sendToActiveControllers(`/dev/${device.name}`, 1);
-      });
-      kasaDevice.on('power-off', () => {
-        console.log('power-off', info.alias);
-        sendToActiveControllers(`/dev/${device.name}`, 0);
-      });
-      */
-      kasaDevice.on('power-update', (powerOn) => {
-        /* await */ noteDeviceState(device, powerOn);
-      });
-    }
-  });
+    /*
+    kasaDevice.on('power-on', () => {
+      console.log('power-on', info.alias);
+      sendToActiveControllers(`/dev/${device.name}`, 1);
+    });
+    kasaDevice.on('power-off', () => {
+      console.log('power-off', info.alias);
+      sendToActiveControllers(`/dev/${device.name}`, 0);
+    });
+    */
+    kasaDevice.on('power-update', (powerOn) => {
+      /* await */ noteDeviceState(device, powerOn);
+    });
+  }
 });
-
-function getDeviceByMac(macAddress) {
-  for (let i = 0; i < devices.length; i ++) {
-    if (devices[i].type === 'kasa' && devices[i].macAddress === macAddress)
-      return devices[i];;
-  }
-
-  return null;
-}
-
-async function setKasaState(macAddress, isOn) {
-  let device = getDeviceByMac(macAddress);
-  if (! device) {
-    console.log(`Kasa device not found – ${macAddress}`);
-    return;
-  }
-  if (! device.kasaDevice) {
-    console.log(`Ignoring offline Kasa device – ${device.name}`);
-    return;
-  }
-  device.kasaDevice.setPowerState(isOn);
-}
 
 /*****************************************************************************/
 /* E131 LED control and pattern generation                                   */
