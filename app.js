@@ -640,7 +640,11 @@ oscServer.on('message', async function (msg, rinfo) {
 
 import { default as kasa } from 'tplink-smarthome-api';
 
-const kasaClient = new kasa.Client({ /* logLevel: "debug" */ });
+const kasaClient = new kasa.Client({
+  defaultSendOptions: {
+    transport: 'udp'
+  },
+  /* logLevel: "debug" */ });
 
 // XXX make it robust to these devices being temporarily offline?
 devices.forEach(async function (device) {
@@ -650,6 +654,7 @@ devices.forEach(async function (device) {
     console.log(`Kasa device ${device.host} (${info.alias}) is ${info.relay_state ? 'on' : 'off'}`);
     device.on = !! info.relay_state;
     device.kasaDevice = kasaDevice;
+    kasaDevice.startPolling(250);
 
     /*
     kasaDevice.on('power-on', () => {
