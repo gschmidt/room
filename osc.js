@@ -39,9 +39,6 @@ function greetController(rinfo) {
 
   if (! controller.lastSeen || (now - controller.lastSeen > CONTROLLER_FORGET_MS)) {
     // Send full state update to new (or returning) controller
-    console.log(`hello ${key}`);
-    controller.client.send(`/rafters/warm/brightness`, 0.25);
-    controller.client.send(`/dev/edison`, true);
     for (let parameter in e131Parameters) {
       controller.client.send(parameter, e131Parameters[parameter]);
     }
