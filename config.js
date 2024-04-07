@@ -30,12 +30,22 @@ export let devices = [
     host: 'closet.kasa.geoffschmidt.com'
   },
   {
-    // Used to be videoconferencing lights at desk, but is now Turkish lamp
-    // Can't rename it without updating the TouchOSC config so save for later
-    name: 'cam-lights',
+    name: 'turkish-lamp',
     on: null,
     type: 'kasa',
     host: 'turkish-lamp.kasa.geoffschmidt.com'
+  },
+  {
+    name: 'small-shadow',
+    on: null,
+    type: 'kasa',
+    host: 'small-shadow.kasa.geoffschmidt.com'
+  },
+  {
+    name: 'large-shadow',
+    on: null,
+    type: 'kasa',
+    host: 'large-shadow.kasa.geoffschmidt.com'
   },
   {
     // Left side wall switch. For switching only - not connected to a load
@@ -140,8 +150,11 @@ export let scenes = {
     lamp: true,
     bed: true,
     closet: true,
-    'cam-lights': true,
+    'turkish-lamp': true,
+    'small-shadow': true,
+    'large-shadow': true,
     'trippy-light': true,
+
   },
   'all-lights-off': {    
     '207r-switch': false,
@@ -149,6 +162,9 @@ export let scenes = {
     lamp: false,
     bed: false,
     closet: false,
+    'turkish-lamp': false,
+    'small-shadow': false,
+    'large-shadow': false,
     'trippy-light': false,
   },
   'alexa-lights-out': {
@@ -158,7 +174,9 @@ export let scenes = {
     lamp: false,
     bed: false,
     closet: false,
-    'cam-lights': false,
+    'turkish-lamp': false,
+    'small-shadow': false,
+    'large-shadow': false,
     'trippy-light': false,
     '/rafters/warm/top': 0,
     '/rafters/warm/bottom': 0,
@@ -191,7 +209,9 @@ export let scenes = {
     lamp: false,
     bed: true,
     closet: false,
-    'cam-lights': false,
+    'turkish-lamp': true,
+    'small-shadow': true,
+    'large-shadow': true,
     'trippy-light': false,
     'sand-table': false,
     projector: false,
@@ -205,7 +225,9 @@ export let scenes = {
     lamp: false,
     bed: false,
     closet: false,
-    'cam-lights': false,
+    'turkish-lamp': false,
+    'small-shadow': false,
+    'large-shadow': false,
     'trippy-light': false,
     'sand-table': false,
     projector: false,
@@ -220,7 +242,9 @@ export let scenes = {
     lamp: true,
     bed: true,
     closet: true,
-    'cam-lights': true,
+    'turkish-lamp': true,
+    'small-shadow': true,
+    'large-shadow': true,
     'trippy-light': true,
     projector: false,
     '/rafters/warm/brightness': .01,
@@ -235,7 +259,9 @@ export let scenes = {
     lamp: false,
     bed: false,
     closet: false,
-    'cam-lights': false,
+    'turkish-lamp': false,
+    'small-shadow': false,
+    'large-shadow': false,
     'trippy-light': false,
     '/rafters/warm/brightness': 0,
     '/rafters/work/brightness': 0,
@@ -264,7 +290,9 @@ export let scenes = {
     lamp: false,
     bed: false,
     closet: false,
-    'cam-lights': false,
+    'turkish-lamp': false,
+    'small-shadow': false,
+    'large-shadow': false,
     'trippy-light': false,
     'sand-table': false,
     projector: true,
@@ -275,7 +303,6 @@ export let scenes = {
   },
   'video-call': {
     _alexa: [ { VideoCallIntent: {} }],
-    'cam-lights': true,
     'trippy-light': true,
     '/rafters/warm/brightness': .1,
     '/rafters/work/brightness': .2,
@@ -291,20 +318,18 @@ export let scenes = {
     '/rafters/pattern/brightness': 0,
   },
   'lamps-on': {
-    '207r-switch': true,
     edison: true,
     lamp: true,
     bed: true,
     closet: true,
-    'cam-lights': true
+    'turkish-lamp': true
   },
   'lamps-off': {
-    '207r-switch': false,
     edison: false,
     lamp: false,
     bed: false,
     closet: false,
-    'cam-lights': false
+    'turkish-lamp': false
   },
   'rafters-off': {
     '/rafters/warm/top': 0,
@@ -316,6 +341,6 @@ export let scenes = {
   },
   'end-video-call': {
 //    _alexa: [ { EndVideoCallIntent: {} }],
-    'cam-lights': false,
+//    'cam-lights': false,
   },
 };
