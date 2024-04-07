@@ -9,28 +9,24 @@ export let devices = [
     name: 'edison',
     on: null,
     type: 'kasa',
-//    macAddress: 'B0:95:75:45:33:C4',
     host: 'edison-bulbs.kasa.geoffschmidt.com'
   },
   {
     name: 'lamp',
     on: null,
     type: 'kasa',
-//    macAddress: 'B0:95:75:45:34:D4',
     host: 'lamp.kasa.geoffschmidt.com'
   },
   {
     name: 'bed',
     on: null,
     type: 'kasa',
-//    macAddress: 'B0:95:75:45:38:8D',
     host: 'bed.kasa.geoffschmidt.com'
   },
   {
     name: 'closet',
     on: null,
     type: 'kasa',
-//    macAddress: 'B0:95:75:45:11:1E'
     host: 'closet.kasa.geoffschmidt.com'
   },
   {
@@ -39,7 +35,6 @@ export let devices = [
     name: 'cam-lights',
     on: null,
     type: 'kasa',
-//    macAddress: '1C:3B:F3:2D:9D:CA',
     host: 'turkish-lamp.kasa.geoffschmidt.com'
   },
   {
@@ -47,7 +42,6 @@ export let devices = [
     name: '207l-switch',
     on: null,
     type: 'kasa',
-//    macAddress: 'D8:07:B6:F7:EF:82',
     host: '207-left.kasa.geoffschmidt.com',
     switchBehavior: {
       type: 'one-button-scene-switch',
@@ -61,7 +55,6 @@ export let devices = [
     name: '207r-switch',
     on: null,
     type: 'kasa',
-//    macAddress: 'D8:07:B6:BF:88:AB',
     host: '207-right.kasa.geoffschmidt.com',
     switchBehavior: {
       type: 'toggle-switch',
