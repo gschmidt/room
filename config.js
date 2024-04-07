@@ -329,7 +329,9 @@ export let scenes = {
     lamp: false,
     bed: false,
     closet: false,
-    'turkish-lamp': false
+    'turkish-lamp': false,
+    'small-shadow': false,
+    'large-shadow': false,
   },
   'rafters-off': {
     '/rafters/warm/top': 0,
