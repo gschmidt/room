@@ -41,10 +41,37 @@ import { sleep } from './helpers.js';
 import { sendHarmonyAction } from './harmony.js';
 import { sendToActiveControllers } from './osc.js';
 
-export async function noteDeviceState(device, on) {
+// This is called:
+// 1) When a scene is triggered (triggerScene)
+// 2) From a tap in the OSC app (changing just a single device)
+export async function setDeviceState(device, on) {
+  recordDeviceState(device, on);
+
+  if (device.type === 'kasa') {
+    if (! device.kasaDevice)
+      console.log(`Ignoring offline Kasa device – ${device.name}`);
+    else
+      device.kasaDevice.setPowerState(on);
+  } else if (device.type === 'harmony') {
+    let actions = on ? device.onActions : device.offActions;
+    for (let i = 0; i < actions.length; i ++) {
+      if (typeof actions[i] === 'number')
+        await sleep(actions[i]);
+      else
+        await sendHarmonyAction(device.deviceId, actions[i]);
+    }
+  } else if (device.type === 'func') {
+    await device.setFunc(on);
+  } else {
+    console.log("don't know how to control device")
+  }
+}
+
+// This is called (currently, only):
+// When we receive a Kasa state change from physical Kasa device
+export async function onHardwareDeviceStateChange(device, on) {
   let changedState = (device.on !== on);
-  device.on = on;
-  sendToActiveControllers(`/dev/${device.name}`, device.on ? 1 : 0);
+  recordDeviceState(device, on);
 
   if (device.switchBehavior && changedState) {
     let behavior = device.switchBehavior;
@@ -56,16 +83,6 @@ export async function noteDeviceState(device, on) {
         behavior._lastPushTime = 0;
         behavior._selectedIndex = null;
         behavior._cleanupTimer = null;
-        behavior._transitioningToState = null;
-      }
-
-      // Don't let our own state changes, echoed back to us, count as user presses
-      if (behavior._transitioningToState !== null) {
-        if (behavior._transitioningToState === device.on) {
-          // Have now reached target state - future changes are real pushes
-          behavior._transitioningToState = null;
-        }
-        return;
       }
 
       if (behavior._cleanupTimer === null) {
@@ -94,16 +111,6 @@ export async function noteDeviceState(device, on) {
         clearTimeout(behavior._cleanupTimer);
       behavior._cleanupTimer = setTimeout(() => {
         behavior._cleanupTimer = null; // exit selection mode
-        // Make the device be in an "on" state, so that if it has a
-        // "nightlight" that lights up when it is off, it isn't lit.
-        if (! device.on) {
-          // Stop this from registering as a user switch press by ignoring all state
-          // changes until we see the effect of the change we're about to make (we can't
-          // just set device.on to true because we might observe a 'false' poll before we
-          // see the result of our change)
-          behavior._transitioningToState = true;
-          /* await */ setDeviceState(device, true, { updateHardwareOnly: true });
-        }
       }, behavior.selectionTime);
     } else {
       throw new Error(`unknown switch behavor '${behavior.type}'`);
@@ -111,39 +118,26 @@ export async function noteDeviceState(device, on) {
   }
 }
 
-export async function setDeviceState(device, on, options) {
-  if (! options || ! options.updateHardwareOnly)
-    await noteDeviceState(device, on);
-
-  if (device.type === 'kasa') {
-    if (! device.kasaDevice)
-      console.log(`Ignoring offline Kasa device – ${device.name}`);
-    else
-      device.kasaDevice.setPowerState(on);
-  } else if (device.type === 'harmony') {
-    let actions = on ? device.onActions : device.offActions;
-    for (let i = 0; i < actions.length; i ++) {
-      if (typeof actions[i] === 'number')
-        await sleep(actions[i]);
-      else
-        await sendHarmonyAction(device.deviceId, actions[i]);
-    }
-  } else if (device.type === 'func') {
-    await device.setFunc(on);
-  } else {
-    console.log("don't know how to control device")
-  }
+function recordDeviceState(device, on) {
+  device.on = on;
+  sendToActiveControllers(`/dev/${device.name}`, device.on ? 1 : 0);
 }
 
 /*****************************************************************************/
 /* Main                                                                      */
 /*****************************************************************************/
 
-import { launchAlexa } from './alexa.js';
+import { launchKasa } from './kasa.js';
+import { launchHarmony } from './harmony.js';
 import { launchE131 } from './e131.js';
+import { launchOsc } from './osc.js';
+import { launchAlexa } from './alexa.js';
 
 function main() {
+  launchKasa();
+  launchHarmony();
   launchE131();
+  launchOsc();
   launchAlexa();
 }
 

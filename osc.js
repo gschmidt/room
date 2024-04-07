@@ -91,4 +91,6 @@ oscServer.on('message', async function (msg, rinfo) {
   }
 });
 
-
+export function launchOsc() {
+  // nothing special to do - the globals do it all
+}

@@ -38,3 +38,7 @@ export async function sendHarmonyAction(deviceId, action) {
     deviceId: deviceId
   });
 }
+
+export function launchHarmony() {
+  // nothing special to do - the globals do it all
+}

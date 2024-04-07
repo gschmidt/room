@@ -4,7 +4,7 @@
 
 import { default as kasa } from 'tplink-smarthome-api';
 import { devices } from './config.js';
-import { noteDeviceState } from './app.js';
+import { onHardwareDeviceStateChange } from './app.js';
 
 const kasaClient = new kasa.Client({
   defaultSendOptions: {
@@ -36,7 +36,11 @@ devices.forEach(async function (device) {
     });
     */
     kasaDevice.on('power-update', (powerOn) => {
-      /* await */ noteDeviceState(device, powerOn);
+      /* await */ onHardwareDeviceStateChange(device, powerOn);
     });
   }
 });
+
+export function launchKasa() {
+  // nothing special to do - the globals do it all
+}
