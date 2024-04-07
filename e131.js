@@ -175,6 +175,8 @@ function cycleColor() {
     // more or solder past the broken LED)
     if (rafter === 2 && side === 1 && pixel > 128)
       rgbw = [0, 0, 0, 0];
+    if (rafter === 6 && side === 1 && pixel > 142)
+      rgbw = [0, 0, 0, 0];
 
     buf[idx + 0] = Math.min(rgbw[1], 255); // green
     buf[idx + 1] = Math.min(rgbw[0], 255); // red
