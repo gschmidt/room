@@ -13,9 +13,9 @@ export let e131Parameters = {
   '/rafters/work/brightness': 0,
   '/rafters/work/top': 0,
   '/rafters/work/bottom': 0,
-  '/rafters/pattern/brightness': 1, // XXX
-  '/rafters/pattern/top': 1, // XXX
-  '/rafters/pattern/bottom': 1, // XXX
+  '/rafters/pattern/brightness': 0,
+  '/rafters/pattern/top': 0,
+  '/rafters/pattern/bottom': 0,
   '/pattern/speed': .3,
   '/pattern/width': .5,
   '/pattern/p1': 1,
