@@ -22,16 +22,31 @@ async function connectToHarmonyHub(hostname) {
       });
     });
     console.log(`Detected Harmony device: ${device.id} (${device.label}), ${actions.length} actions`);
-//      console.log(`Actions: ${actions.join(',' )}`);
+//      console.log(`Actions: ${actions.join(',')}`);
   });
 
   return client;
 };
 
-// Perhaps be robust to failing to connect to the Harmony Hub?
-let harmonyClient = await connectToHarmonyHub(HARMONY_HUB_HOSTNAME);
+let harmonyClient = null;
+
+(async () => {
+  while (true) {
+    try {
+      harmonyClient = await connectToHarmonyHub(HARMONY_HUB_HOSTNAME);
+      break;
+    } catch (e) {
+      console.log(`Harmony Hub not available, retrying in 15s: ${e.message}`);
+      await new Promise(resolve => setTimeout(resolve, 15000));
+    }
+  }
+})();
 
 export async function sendHarmonyAction(deviceId, action) {
+  if (! harmonyClient) {
+    console.log(`Ignoring Harmony action (hub not connected): ${deviceId} ${action}`);
+    return;
+  }
   console.log(`'${deviceId} ${action}'`);
   const result = await harmonyClient.send('holdAction', {
     command: action,
