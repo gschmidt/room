@@ -15,29 +15,48 @@ const kasaClient = new kasa.Client({
   },
   /* logLevel: "debug" */ });
 
-// XXX make it robust to these devices being temporarily offline?
-devices.forEach(async function (device) {
-  if (device.type === 'kasa') {
-    const kasaDevice = await kasaClient.getDevice({ host: device.host });
-    let info = await kasaDevice.getSysInfo();
-    console.log(`Kasa device ${device.host} (${info.alias}) is ${info.relay_state ? 'on' : 'off'}`);
-    device.on = !! info.relay_state;
-    device.kasaDevice = kasaDevice;
-    kasaDevice.startPolling(250);
+async function connectKasaDevice(device) {
+  while (true) {
+    try {
+      const kasaDevice = await kasaClient.getDevice({ host: device.host });
+      let info = await kasaDevice.getSysInfo();
+      console.log(`Kasa device ${device.host} (${info.alias}) is ${info.relay_state ? 'on' : 'off'}`);
+      device.on = !! info.relay_state;
+      device.kasaDevice = kasaDevice;
+      kasaDevice.startPolling(250);
 
-    /*
-    kasaDevice.on('power-on', () => {
-      console.log('power-on', info.alias);
-      sendToActiveControllers(`/dev/${device.name}`, 1);
-    });
-    kasaDevice.on('power-off', () => {
-      console.log('power-off', info.alias);
-      sendToActiveControllers(`/dev/${device.name}`, 0);
-    });
-    */
-    kasaDevice.on('power-update', (powerOn) => {
-      /* await */ onHardwareDeviceStateChange(device, powerOn);
-    });
+      /*
+      kasaDevice.on('power-on', () => {
+        console.log('power-on', info.alias);
+        sendToActiveControllers(`/dev/${device.name}`, 1);
+      });
+      kasaDevice.on('power-off', () => {
+        console.log('power-off', info.alias);
+        sendToActiveControllers(`/dev/${device.name}`, 0);
+      });
+      */
+      kasaDevice.on('power-update', (powerOn) => {
+        /* await */ onHardwareDeviceStateChange(device, powerOn);
+      });
+
+      kasaDevice.on('error', (err) => {
+        console.log(`Kasa device ${device.host} went offline: ${err.message}`);
+        kasaDevice.stopPolling();
+        device.kasaDevice = null;
+        connectKasaDevice(device);
+      });
+
+      break;
+    } catch (e) {
+      console.log(`Kasa device ${device.host} not available, retrying in 15s: ${e.message}`);
+      await new Promise(resolve => setTimeout(resolve, 15000));
+    }
+  }
+}
+
+devices.forEach((device) => {
+  if (device.type === 'kasa') {
+    connectKasaDevice(device);
   }
 });
 
