@@ -39,7 +39,7 @@ async function connectKasaDevice(device) {
         /* await */ onHardwareDeviceStateChange(device, powerOn);
       });
 
-      kasaDevice.on('error', (err) => {
+      kasaDevice.on('polling-error', (err) => {
         console.log(`Kasa device ${device.host} went offline: ${err.message}`);
         kasaDevice.stopPolling();
         device.kasaDevice = null;
