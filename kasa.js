@@ -16,6 +16,9 @@ const kasaClient = new kasa.Client({
   /* logLevel: "debug" */ });
 
 async function connectKasaDevice(device) {
+  if (device._connecting) return;
+  device._connecting = true;
+
   while (true) {
     try {
       const kasaDevice = await kasaClient.getDevice({ host: device.host });
@@ -46,6 +49,7 @@ async function connectKasaDevice(device) {
         connectKasaDevice(device);
       });
 
+      device._connecting = false;
       break;
     } catch (e) {
       console.log(`Kasa device ${device.host} not available, retrying in 15s: ${e.message}`);
