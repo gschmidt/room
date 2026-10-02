@@ -175,7 +175,7 @@ function cycleColor() {
     // more or solder past the broken LED)
     if (rafter === 2 && side === 1 && pixel > 128)
       rgbw = [0, 0, 0, 0];
-    if (rafter === 6 && side === 1 && pixel > 142)
+    if (rafter === 6 && side === 1 && pixel > 36)  // moved from 142 on 2026-10-01; LED 37 failed
       rgbw = [0, 0, 0, 0];
 
     buf[idx + 0] = Math.min(rgbw[1], 255); // green
