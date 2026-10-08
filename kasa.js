@@ -6,6 +6,13 @@ import { default as kasa } from 'tplink-smarthome-api';
 import { devices } from './config.js';
 import { onHardwareDeviceStateChange } from './app.js';
 
+const POLL_INTERVAL_MS = 250;
+// Backstop in case a request never settles (tplink-smarthome-api 2.x could hang
+// forever on a half-closed socket, wedging that device's request queue). The
+// library's own timeout should normally fire first.
+const POLL_TIMEOUT_MS = 15000;
+const RETRY_MS = 15000;
+
 const kasaClient = new kasa.Client({
   defaultSendOptions: {
     // While UDP is probably better in theory, even a single lost packet throws
@@ -15,52 +22,66 @@ const kasaClient = new kasa.Client({
   },
   /* logLevel: "debug" */ });
 
-async function connectKasaDevice(device) {
-  if (device._connecting) return;
-  device._connecting = true;
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`no response in ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// Runs forever: connect, poll until the device stops responding, reconnect.
+// Each reconnect gets a fresh device object (and so a fresh connection and
+// request queue), abandoning anything that got stuck on the old one.
+async function runKasaDevice(device) {
   while (true) {
+    let kasaDevice;
     try {
-      const kasaDevice = await kasaClient.getDevice({ host: device.host });
+      kasaDevice = await kasaClient.getDevice({ host: device.host });
       let info = await kasaDevice.getSysInfo();
       console.log(`Kasa device ${device.host} (${info.alias}) is ${info.relay_state ? 'on' : 'off'}`);
       device.on = !! info.relay_state;
-      device.kasaDevice = kasaDevice;
-      kasaDevice.startPolling(250);
-
-      /*
-      kasaDevice.on('power-on', () => {
-        console.log('power-on', info.alias);
-        sendToActiveControllers(`/dev/${device.name}`, 1);
-      });
-      kasaDevice.on('power-off', () => {
-        console.log('power-off', info.alias);
-        sendToActiveControllers(`/dev/${device.name}`, 0);
-      });
-      */
-      kasaDevice.on('power-update', (powerOn) => {
-        /* await */ onHardwareDeviceStateChange(device, powerOn);
-      });
-
-      kasaDevice.on('polling-error', (err) => {
-        console.log(`Kasa device ${device.host} went offline: ${err.message}`);
-        kasaDevice.stopPolling();
-        device.kasaDevice = null;
-        connectKasaDevice(device);
-      });
-
-      device._connecting = false;
-      break;
     } catch (e) {
-      console.log(`Kasa device ${device.host} not available, retrying in 15s: ${e.message}`);
-      await new Promise(resolve => setTimeout(resolve, 15000));
+      console.log(`Kasa device ${device.host} not available, retrying in ${RETRY_MS / 1000}s: ${e.message}`);
+      await sleep(RETRY_MS);
+      continue;
+    }
+
+    /*
+    kasaDevice.on('power-on', () => {
+      console.log('power-on', info.alias);
+      sendToActiveControllers(`/dev/${device.name}`, 1);
+    });
+    kasaDevice.on('power-off', () => {
+      console.log('power-off', info.alias);
+      sendToActiveControllers(`/dev/${device.name}`, 0);
+    });
+    */
+    // Emitted after every successful poll (whether or not the state changed)
+    kasaDevice.on('power-update', (powerOn) => {
+      /* await */ onHardwareDeviceStateChange(device, powerOn);
+    });
+    device.kasaDevice = kasaDevice;
+
+    try {
+      while (true) {
+        await sleep(POLL_INTERVAL_MS);
+        await withTimeout(kasaDevice.getSysInfo(), POLL_TIMEOUT_MS);
+      }
+    } catch (err) {
+      console.log(`Kasa device ${device.host} went offline: ${err.message}`);
+      // Ignore any late events from the abandoned device object
+      kasaDevice.removeAllListeners('power-update');
+      device.kasaDevice = null;
     }
   }
 }
 
 devices.forEach((device) => {
   if (device.type === 'kasa') {
-    connectKasaDevice(device);
+    runKasaDevice(device);
   }
 });
 

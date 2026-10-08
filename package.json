@@ -19,6 +19,6 @@
     "node-osc": "^5.1.0",
     "request": "^2.88.2",
     "request-promise": "^4.2.5",
-    "tplink-smarthome-api": "^2.0.0"
+    "tplink-smarthome-api": "^5.0.0"
   }
 }
